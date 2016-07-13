@@ -12,7 +12,7 @@ Widget::Widget(QWidget *parent)
     });
     setWindowFlags(Qt::Dialog);
     resize(600, 800);
-    m_parser->loadFile("test.epub");
+    m_parser->loadFile("Lorem Ipsum.epub");
 }
 
 Widget::~Widget()

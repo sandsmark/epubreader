@@ -135,6 +135,23 @@ bool EPubParser::parseContentFile(const QString filepath)
         }
     }
 
+    // Extract current path
+    QString contentFileFolder = filepath;
+    int separatorIndex = filepath.lastIndexOf('/');
+    if (separatorIndex > 0) {
+        contentFileFolder = contentFileFolder.left(separatorIndex);
+    }
+    qDebug() << contentFileFolder;
+
+    QDomNodeList manifestNodeList = document.elementsByTagName("manifest");
+    for (int i=0; i<manifestNodeList.count(); i++) {
+        QDomElement manifestElement = manifestNodeList.at(i).toElement();
+        QDomNodeList manifestItemList = manifestElement.elementsByTagName("item");
+        for (int j=0; j<manifestItemList.count(); j++) {
+            parseManifestItem(manifestItemList.at(j), contentFileFolder);
+        }
+    }
+
     return true;
 }
 
@@ -170,6 +187,32 @@ bool EPubParser::parseMetadata(const QDomNode &metadataNode)
     }
     m_metadata[metaName] = metaValue;
 
+    return true;
+}
+
+bool EPubParser::parseManifestItem(const QDomNode &manifestNode, const QString currentFolder)
+{
+    if (!manifestNode.isElement()) {
+        qWarning() << manifestNode.localName() << "was not an element!";
+        qWarning() << "at line" << manifestNode.lineNumber();
+        return false;
+    }
+    QDomElement manifestElement = manifestNode.toElement();
+    QString id = manifestElement.attribute("id");
+    QString path = manifestElement.attribute("href");
+    QString type = manifestElement.attribute("media-type");
+
+    if (id.isEmpty() || path.isEmpty()) {
+        qWarning() << "Invalid item at line" << manifestElement.lineNumber();
+        return false;
+    }
+
+    path = QDir::cleanPath(currentFolder + '/' + path);
+
+    EpubItem item;
+    item.mimetype  = m_mimeDatabase.mimeTypeForName(type);
+    item.path = path;
+    m_items[id] = item;
     return true;
 }
 
