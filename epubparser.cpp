@@ -131,37 +131,44 @@ bool EPubParser::parseContentFile(const QString filepath)
     for (int i=0; i<metadataNodeList.count(); i++) {
         QDomNodeList metadataChildList = metadataNodeList.at(i).childNodes();
         for (int j=0; j<metadataChildList.count(); j++) {
-            parseMetadata(metadataChildList.at(j));
+            parseMetadataItem(metadataChildList.at(j));
         }
     }
 
-    // Extract current path
+    // Extract current path, for resolving relative paths
     QString contentFileFolder = filepath;
     int separatorIndex = filepath.lastIndexOf('/');
     if (separatorIndex > 0) {
         contentFileFolder = contentFileFolder.left(separatorIndex);
     }
-    qDebug() << contentFileFolder;
 
     QDomNodeList manifestNodeList = document.elementsByTagName("manifest");
     for (int i=0; i<manifestNodeList.count(); i++) {
         QDomElement manifestElement = manifestNodeList.at(i).toElement();
         QDomNodeList manifestItemList = manifestElement.elementsByTagName("item");
+
         for (int j=0; j<manifestItemList.count(); j++) {
             parseManifestItem(manifestItemList.at(j), contentFileFolder);
+        }
+    }
+
+    // Parse out the document order
+    QDomNodeList spineNodeList = document.elementsByTagName("spine");
+    for (int i=0; i<spineNodeList.count(); i++) {
+        QDomElement spineElement = spineNodeList.at(i).toElement();
+        m_indexItem = spineElement.attribute("toc");
+
+        QDomNodeList spineItemList = spineElement.elementsByTagName("itemref");
+        for (int j=0; j<spineItemList.count(); j++) {
+            parseSpineItem(spineItemList.at(j));
         }
     }
 
     return true;
 }
 
-bool EPubParser::parseMetadata(const QDomNode &metadataNode)
+bool EPubParser::parseMetadataItem(const QDomNode &metadataNode)
 {
-    if (!metadataNode.isElement()) {
-        qWarning() << metadataNode.localName() << "was not an element!";
-        qWarning() << "at line" << metadataNode.lineNumber();
-        return false;
-    }
     QDomElement metadataElement = metadataNode.toElement();
     QString tagName = metadataElement.tagName();
 
@@ -192,11 +199,6 @@ bool EPubParser::parseMetadata(const QDomNode &metadataNode)
 
 bool EPubParser::parseManifestItem(const QDomNode &manifestNode, const QString currentFolder)
 {
-    if (!manifestNode.isElement()) {
-        qWarning() << manifestNode.localName() << "was not an element!";
-        qWarning() << "at line" << manifestNode.lineNumber();
-        return false;
-    }
     QDomElement manifestElement = manifestNode.toElement();
     QString id = manifestElement.attribute("id");
     QString path = manifestElement.attribute("href");
@@ -207,12 +209,45 @@ bool EPubParser::parseManifestItem(const QDomNode &manifestNode, const QString c
         return false;
     }
 
+    // Resolve relative paths
     path = QDir::cleanPath(currentFolder + '/' + path);
 
     EpubItem item;
-    item.mimetype  = m_mimeDatabase.mimeTypeForName(type);
+    item.mimetype  = type;
     item.path = path;
     m_items[id] = item;
+
+    static QSet<QString> documentTypes({"text/x-oeb1-document", "application/x-dtbook+xml", "application/xhtml+xml"});
+    // All items not listed in the spine should be in this
+    if (documentTypes.contains(type)) {
+        m_unorderedItems.insert(id);
+    }
+
+    return true;
+}
+
+bool EPubParser::parseSpineItem(const QDomNode &spineNode)
+{
+    QDomElement spineElement = spineNode.toElement();
+
+    if (spineElement.attribute("linear") == "no") {
+        return true;
+    }
+
+    QString referenceName = spineElement.attribute("idref");
+    if (referenceName.isEmpty()) {
+        qWarning() << "Invalid spine item at line" << spineNode.lineNumber();
+        return false;
+    }
+
+    if (!m_items.keys().contains(referenceName)) {
+        qWarning() << "Unable to find" << referenceName << "in items";
+        return false;
+    }
+
+    m_unorderedItems.remove(referenceName);
+    m_orderedItems.append(referenceName);
+
     return true;
 }
 

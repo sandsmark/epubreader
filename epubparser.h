@@ -3,6 +3,8 @@
 
 #include <QObject>
 #include <QMap>
+#include <QSet>
+#include <QVector>
 #include <QDomNode>
 #include <QMimeDatabase>
 
@@ -13,7 +15,7 @@ class QXmlStreamReader;
 
 struct EpubItem {
     QString path;
-    QMimeType mimetype;
+    QString mimetype;
 };
 
 class EPubParser : public QObject
@@ -34,15 +36,22 @@ private:
     bool parseMimetype();
     bool parseContainer();
     bool parseContentFile(const QString filepath);
-    bool parseMetadata(const QDomNode &metadataNode);
-    bool parseManifestItem(const QDomNode &manifestNode, const QString currentFolder);
+    bool parseMetadataItem(const QDomNode &metadataNode);
+    bool parseManifestItem(const QDomNode &manifestNodes, const QString currentFolder);
+    bool parseSpineItem(const QDomNode &spineNode);
 
     const KArchiveFile *getFile(const QString &path);
 
     KZip *m_archive;
     const KArchiveDirectory *m_rootFolder;
+
     QMap<QString, QString> m_metadata;
+    QString m_indexItem;
+
     QMap<QString, EpubItem> m_items;
+    QVector<QString> m_orderedItems;
+    QSet<QString> m_unorderedItems;
+
     QMimeDatabase m_mimeDatabase;
 };
 
