@@ -177,10 +177,10 @@ bool EPubContainer::parseContentFile(const QString filepath)
     }
 
     // Extract current path, for resolving relative paths
-    QString contentFileFolder = filepath;
+    QString contentFileFolder;
     int separatorIndex = filepath.lastIndexOf('/');
     if (separatorIndex > 0) {
-        contentFileFolder = contentFileFolder.left(separatorIndex);
+        contentFileFolder = filepath.left(separatorIndex + 1);
     }
 
     // Parse out all the components/items in the epub
@@ -270,7 +270,7 @@ bool EPubContainer::parseManifestItem(const QDomNode &manifestNode, const QStrin
     }
 
     // Resolve relative paths
-    path = QDir::cleanPath(currentFolder + '/' + path);
+    path = QDir::cleanPath(currentFolder + path);
 
     EpubItem item;
     item.mimetype  = type.toUtf8();
@@ -290,8 +290,9 @@ bool EPubContainer::parseSpineItem(const QDomNode &spineNode)
 {
     QDomElement spineElement = spineNode.toElement();
 
+    // Ignore this for now
     if (spineElement.attribute("linear") == "no") {
-        return true;
+//        return true;
     }
 
     QString referenceName = spineElement.attribute("idref");
@@ -339,13 +340,19 @@ bool EPubContainer::parseGuideItem(const QDomNode &guideItem)
 
 const KArchiveFile *EPubContainer::getFile(const QString &path)
 {
-    QStringList pathParts = path.split('/');
     const KArchiveDirectory *folder = m_rootFolder;
+
+    // Try to walk down the correct path
+    QStringList pathParts = path.split('/', QString::SkipEmptyParts);
     for (int i=0; i<pathParts.count() - 1; i++) {
         QString folderName = pathParts[i];
         const KArchiveEntry *entry = folder->entry(folderName);
+        if (!entry) {
+            qWarning() << "Unable to find folder name" << folderName << "in" << path;
+            return nullptr;
+        }
         if (!entry->isDirectory()) {
-            qWarning() << "Expected" << folderName << "to be a directory";
+            qWarning() << "Expected" << folderName << "to be a directory in path" << path;
             return nullptr;
         }
 

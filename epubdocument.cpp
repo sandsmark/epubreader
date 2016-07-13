@@ -30,13 +30,13 @@ QVariant EPubDocument::loadResource(int type, const QUrl &name)
 {
     QString path = name.path();
 
-    QString contentFileFolder = m_currentItem.path;
-    int separatorIndex = contentFileFolder.lastIndexOf('/');
+    QString contentFileFolder;
+    int separatorIndex = m_currentItem.path.lastIndexOf('/');
     if (separatorIndex > 0) {
-        contentFileFolder = contentFileFolder.left(separatorIndex);
+        contentFileFolder = m_currentItem.path.left(separatorIndex + 1);
     }
 
-    path = QDir::cleanPath(contentFileFolder + '/' + path);
+    path = QDir::cleanPath(contentFileFolder + path);
     QSharedPointer<QIODevice> ioDevice = m_container->getIoDevice(path);
     if (!ioDevice) {
         qWarning() << "Unable to get io device for" << path;

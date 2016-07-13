@@ -13,11 +13,11 @@ Widget::Widget(QWidget *parent)
       m_currentChapter(0)
 {
     connect(m_parser, &EPubContainer::errorHappened, [](QString error) {
-        qWarning() << error;
+        qWarning().noquote() << error;
     });
     setWindowFlags(Qt::Dialog);
     resize(600, 800);
-    if (!m_parser->openFile("test.epub")) {
+    if (!m_parser->openFile("Lorem Ipsum.epub")) {
         return;
     }
 
@@ -45,6 +45,7 @@ void Widget::setChapter(int chapter)
     }
     m_document->setChapter(chapters[chapter]);
     m_currentChapter = chapter;
+    m_yOffset = 0;
     update();
 }
 
