@@ -142,6 +142,7 @@ bool EPubParser::parseContentFile(const QString filepath)
         contentFileFolder = contentFileFolder.left(separatorIndex);
     }
 
+    // Parse out all the components/items in the epub
     QDomNodeList manifestNodeList = document.elementsByTagName("manifest");
     for (int i=0; i<manifestNodeList.count(); i++) {
         QDomElement manifestElement = manifestNodeList.at(i).toElement();
@@ -156,11 +157,29 @@ bool EPubParser::parseContentFile(const QString filepath)
     QDomNodeList spineNodeList = document.elementsByTagName("spine");
     for (int i=0; i<spineNodeList.count(); i++) {
         QDomElement spineElement = spineNodeList.at(i).toElement();
-        m_indexItem = spineElement.attribute("toc");
+
+        QString tocId = spineElement.attribute("toc");
+        if (!tocId.isEmpty() && m_items.keys().contains(tocId)) {
+            EpubPageReference tocReference;
+            tocReference.title = tr("Table of Contents");
+            tocReference.target = tocId;
+            m_standardReferences.insert(EpubPageReference::TableOfContents, tocReference);
+        }
 
         QDomNodeList spineItemList = spineElement.elementsByTagName("itemref");
         for (int j=0; j<spineItemList.count(); j++) {
             parseSpineItem(spineItemList.at(j));
+        }
+    }
+
+    // Parse out standard items
+    QDomNodeList guideNodeList = document.elementsByTagName("guide");
+    for (int i=0; i<guideNodeList.count(); i++) {
+        QDomElement guideElement = guideNodeList.at(i).toElement();
+
+        QDomNodeList guideItemList = guideElement.elementsByTagName("reference");
+        for (int j=0; j<guideItemList.count(); j++) {
+            parseGuideItem(guideItemList.at(j));
         }
     }
 
@@ -247,6 +266,32 @@ bool EPubParser::parseSpineItem(const QDomNode &spineNode)
 
     m_unorderedItems.remove(referenceName);
     m_orderedItems.append(referenceName);
+
+    return true;
+}
+
+bool EPubParser::parseGuideItem(const QDomNode &guideItem)
+{
+    QDomElement guideElement = guideItem.toElement();
+    QString target = guideElement.attribute("href");
+    QString title = guideElement.attribute("title");
+    QString type = guideElement.attribute("title");
+
+    if (target.isEmpty() || title.isEmpty() || type.isEmpty()) {
+        qWarning() << "Invalid guide item" << target << title << type;
+        return false;
+    }
+
+    EpubPageReference reference;
+    reference.target = target;
+    reference.title = title;
+
+    EpubPageReference::StandardType standardType = EpubPageReference::typeFromString(type);
+    if (standardType == EpubPageReference::Other) {
+        m_otherReferences[type] = reference;
+    } else {
+        m_standardReferences[standardType] = reference;
+    }
 
     return true;
 }
