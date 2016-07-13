@@ -29,6 +29,7 @@ Widget::Widget(QWidget *parent)
     if (chapters.count() > 0) {
         m_document->setChapter(chapters.first());
     }
+    m_document->setPageSize(size());
 }
 
 Widget::~Widget()
@@ -47,10 +48,22 @@ void Widget::setChapter(int chapter)
     update();
 }
 
+void Widget::scroll(int amount)
+{
+    int offset = m_yOffset + amount;
+    offset = qMin(int(m_document->size().height() - m_document->pageSize().height()), offset);
+    m_yOffset = qMax(0, offset);
+    update();
+}
+
 void Widget::paintEvent(QPaintEvent*)
 {
     QPainter painter(this);
-    m_document->drawContents(&painter, rect());
+    painter.translate(0, -m_yOffset);
+    QRect r(rect());
+    r.translate(0, m_yOffset);
+
+    m_document->drawContents(&painter, r);
 }
 
 void Widget::keyPressEvent(QKeyEvent *event)
@@ -59,5 +72,13 @@ void Widget::keyPressEvent(QKeyEvent *event)
         setChapter(m_currentChapter + 1);
     } else if (event->key() == Qt::Key_Left) {
         setChapter(m_currentChapter - 1);
+    } else if (event->key() == Qt::Key_Up) {
+        scroll(-20);
+    } else if (event->key() == Qt::Key_Down) {
+        scroll(20);
+    } else if (event->key() == Qt::Key_PageUp) {
+        scroll(-m_document->pageSize().height());
+    } else if (event->key() == Qt::Key_PageDown) {
+        scroll(m_document->pageSize().height());
     }
 }

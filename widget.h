@@ -17,16 +17,18 @@ public:
     void openPage(int page);
 
     void setChapter(int chapter);
+    void scroll(int amount);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
-    int m_currentChapter;
     EPubContainer *m_parser;
     QImage m_cover;
     EPubDocument *m_document;
+    int m_currentChapter;
+    int m_yOffset;
 };
 
 #endif // WIDGET_H

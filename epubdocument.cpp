@@ -7,7 +7,7 @@
 EPubDocument::EPubDocument(EPubContainer *container, QObject *parent) : QTextDocument(parent),
     m_container(container)
 {
-
+    setUndoRedoEnabled(false);
 }
 
 void EPubDocument::setChapter(const QString &id)
