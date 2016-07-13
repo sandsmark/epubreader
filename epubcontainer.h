@@ -1,5 +1,5 @@
-#ifndef EPUBPARSER_H
-#define EPUBPARSER_H
+#ifndef EPUBCONTAINER_H
+#define EPUBCONTAINER_H
 
 #include <QObject>
 #include <QHash>
@@ -46,12 +46,12 @@ struct EpubPageReference {
     QString title;
 };
 
-class EPubParser : public QObject
+class EPubContainer : public QObject
 {
     Q_OBJECT
 public:
-    explicit EPubParser(QObject *parent = 0);
-    ~EPubParser();
+    explicit EPubContainer(QObject *parent = 0);
+    ~EPubContainer();
 
     bool openFile(const QString path);
 
@@ -89,4 +89,4 @@ private:
     QMimeDatabase m_mimeDatabase;
 };
 
-#endif // EPUBPARSER_H
+#endif // EPUBCONTAINER_H

@@ -1,4 +1,5 @@
-#include "epubparser.h"
+#include "epubcontainer.h"
+
 #include <KZip>
 #include <KArchiveDirectory>
 #include <KArchiveFile>
@@ -14,19 +15,19 @@
 #define MIMETYPE_FILE "mimetype"
 #define CONTAINER_FILE "META-INF/container.xml"
 
-EPubParser::EPubParser(QObject *parent) : QObject(parent),
+EPubContainer::EPubContainer(QObject *parent) : QObject(parent),
     m_archive(nullptr),
     m_rootFolder(nullptr)
 {
 
 }
 
-EPubParser::~EPubParser()
+EPubContainer::~EPubContainer()
 {
     delete m_archive;
 }
 
-bool EPubParser::openFile(const QString path)
+bool EPubContainer::openFile(const QString path)
 {
     delete m_archive;
 
@@ -55,7 +56,7 @@ bool EPubParser::openFile(const QString path)
     return true;
 }
 
-QSharedPointer<QIODevice> EPubParser::getIoDevice(const QString &id)
+QSharedPointer<QIODevice> EPubContainer::getIoDevice(const QString &id)
 {
     if (!m_items.contains(id)) {
         qWarning() << "Asked for unknown item" << id;
@@ -73,7 +74,7 @@ QSharedPointer<QIODevice> EPubParser::getIoDevice(const QString &id)
     return QSharedPointer<QIODevice>(file->createDevice());
 }
 
-QImage EPubParser::getImage(const QString &id)
+QImage EPubContainer::getImage(const QString &id)
 {
     if (!m_items.contains(id)) {
         qWarning() << "Asked for unknown item" << id;
@@ -96,12 +97,12 @@ QImage EPubParser::getImage(const QString &id)
     return QImage::fromData(ioDevice->readAll());
 }
 
-QString EPubParser::getMetadata(const QString &key)
+QString EPubContainer::getMetadata(const QString &key)
 {
     return m_metadata.value(key);
 }
 
-bool EPubParser::parseMimetype()
+bool EPubContainer::parseMimetype()
 {
     Q_ASSERT(m_rootFolder);
 
@@ -121,7 +122,7 @@ bool EPubParser::parseMimetype()
     return true;
 }
 
-bool EPubParser::parseContainer()
+bool EPubContainer::parseContainer()
 {
     Q_ASSERT(m_rootFolder);
 
@@ -163,7 +164,7 @@ bool EPubParser::parseContainer()
     return false;
 }
 
-bool EPubParser::parseContentFile(const QString filepath)
+bool EPubContainer::parseContentFile(const QString filepath)
 {
     const KArchiveFile *rootFile = getFile(filepath);
     if (!rootFile) {
@@ -233,7 +234,7 @@ bool EPubParser::parseContentFile(const QString filepath)
     return true;
 }
 
-bool EPubParser::parseMetadataItem(const QDomNode &metadataNode)
+bool EPubContainer::parseMetadataItem(const QDomNode &metadataNode)
 {
     QDomElement metadataElement = metadataNode.toElement();
     QString tagName = metadataElement.tagName();
@@ -263,7 +264,7 @@ bool EPubParser::parseMetadataItem(const QDomNode &metadataNode)
     return true;
 }
 
-bool EPubParser::parseManifestItem(const QDomNode &manifestNode, const QString currentFolder)
+bool EPubContainer::parseManifestItem(const QDomNode &manifestNode, const QString currentFolder)
 {
     QDomElement manifestElement = manifestNode.toElement();
     QString id = manifestElement.attribute("id");
@@ -292,7 +293,7 @@ bool EPubParser::parseManifestItem(const QDomNode &manifestNode, const QString c
     return true;
 }
 
-bool EPubParser::parseSpineItem(const QDomNode &spineNode)
+bool EPubContainer::parseSpineItem(const QDomNode &spineNode)
 {
     QDomElement spineElement = spineNode.toElement();
 
@@ -317,7 +318,7 @@ bool EPubParser::parseSpineItem(const QDomNode &spineNode)
     return true;
 }
 
-bool EPubParser::parseGuideItem(const QDomNode &guideItem)
+bool EPubContainer::parseGuideItem(const QDomNode &guideItem)
 {
     QDomElement guideElement = guideItem.toElement();
     QString target = guideElement.attribute("href");
@@ -343,13 +344,12 @@ bool EPubParser::parseGuideItem(const QDomNode &guideItem)
     return true;
 }
 
-const KArchiveFile *EPubParser::getFile(const QString &path)
+const KArchiveFile *EPubContainer::getFile(const QString &path)
 {
     QStringList pathParts = path.split('/');
     const KArchiveDirectory *folder = m_rootFolder;
     for (int i=0; i<pathParts.count() - 1; i++) {
         QString folderName = pathParts[i];
-        qDebug() << "Entering folder" << folderName;
         const KArchiveEntry *entry = folder->entry(folderName);
         if (!entry->isDirectory()) {
             qWarning() << "Expected" << folderName << "to be a directory";

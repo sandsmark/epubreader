@@ -1,14 +1,14 @@
 #include "widget.h"
 
-#include "epubparser.h"
+#include "epubcontainer.h"
 #include <QDebug>
 #include <QPainter>
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent),
-      m_parser(new EPubParser(this))
+      m_parser(new EPubContainer(this))
 {
-    connect(m_parser, &EPubParser::errorHappened, [](QString error) {
+    connect(m_parser, &EPubContainer::errorHappened, [](QString error) {
         qWarning() << error;
     });
     setWindowFlags(Qt::Dialog);
