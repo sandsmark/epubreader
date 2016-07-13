@@ -320,3 +320,43 @@ const KArchiveFile *EPubParser::getFile(const QString &path)
     }
     return file;
 }
+
+EpubPageReference::StandardType EpubPageReference::typeFromString(const QString &name) {
+    if (name == "cover") {
+        return CoverPage;
+    } else if (name == "title-page") {
+        return TitlePage;
+    } else if (name == "toc") {
+        return TableOfContents;
+    } else if (name == "index") {
+        return Index;
+    } else if (name == "glossary") {
+        return Glossary;
+    } else if (name == "acknowledgements") {
+        return Acknowledgements;
+    } else if (name == "bibliography") {
+        return Bibliography;
+    } else if (name == "colophon") {
+        return Colophon;
+    } else if (name == "copyright-page") {
+        return CopyrightPage;
+    } else if (name == "dedication") {
+        return Dedication;
+    } else if (name == "epigraph") {
+        return Epigraph;
+    } else if (name == "foreword") {
+        return Foreword;
+    } else if (name == "loi") {
+        return ListOfIllustrations;
+    } else if (name == "lot") {
+        return ListOfTables;
+    } else if (name == "notes") {
+        return Notes;
+    } else if (name == "preface") {
+        return Preface;
+    } else if (name == "text") {
+        return Text;
+    } else {
+        return Other;
+    }
+}
