@@ -62,6 +62,8 @@ public:
     QString getMetadata(const QString &key);
     QStringList getItems() { return m_orderedItems; }
 
+    QString getStandardPage(EpubPageReference::StandardType type) { return m_standardReferences.value(type).target; }
+
 signals:
     void errorHappened(const QString &error);
 

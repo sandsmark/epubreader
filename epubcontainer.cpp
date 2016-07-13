@@ -19,7 +19,6 @@ EPubContainer::EPubContainer(QObject *parent) : QObject(parent),
     m_archive(nullptr),
     m_rootFolder(nullptr)
 {
-
 }
 
 EPubContainer::~EPubContainer()

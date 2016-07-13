@@ -1,6 +1,5 @@
 #include "widget.h"
 
-#include "epubcontainer.h"
 #include "epubdocument.h"
 #include <QDebug>
 #include <QPainter>
@@ -8,45 +7,23 @@
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent),
-      m_parser(new EPubContainer(this)),
-      m_document(new EPubDocument(m_parser, this)),
+      m_document(new EPubDocument()),
       m_currentChapter(0)
 {
-    connect(m_parser, &EPubContainer::errorHappened, [](QString error) {
-        qWarning().noquote() << error;
-    });
     setWindowFlags(Qt::Dialog);
     resize(600, 800);
-    if (!m_parser->openFile("Lorem Ipsum.epub")) {
-        return;
-    }
 
-    QString coverId = m_parser->getMetadata("cover");
-    if (!coverId.isEmpty()) {
-        m_cover = m_parser->getImage(coverId);
-    }
-    QStringList chapters = m_parser->getItems();
-    if (chapters.count() > 0) {
-        m_document->setChapter(chapters.first());
-    }
+    connect(m_document, &EPubDocument::loadCompleted, [&]() {
+        update();
+    });
+
     m_document->setPageSize(size());
+    m_document->openDocument("test.epub");
 }
 
 Widget::~Widget()
 {
 
-}
-
-void Widget::setChapter(int chapter)
-{
-    QStringList chapters = m_parser->getItems();
-    if (chapter < 0 || chapter >= chapters.count()) {
-        return;
-    }
-    m_document->setChapter(chapters[chapter]);
-    m_currentChapter = chapter;
-    m_yOffset = 0;
-    update();
 }
 
 void Widget::scroll(int amount)
@@ -57,9 +34,25 @@ void Widget::scroll(int amount)
     update();
 }
 
+void Widget::scrollPage(int amount)
+{
+    int currentPage = m_yOffset / m_document->pageSize().height();
+    currentPage += amount;
+    int offset = currentPage * m_document->pageSize().height();
+    offset = qMin(int(m_document->size().height() - m_document->pageSize().height()), offset);
+    m_yOffset = qMax(0, offset);
+    update();
+}
+
 void Widget::paintEvent(QPaintEvent*)
 {
     QPainter painter(this);
+    if (!m_document->loaded()) {
+        painter.fillRect(rect(), Qt::white);
+        painter.drawText(rect(), Qt::AlignCenter, "Loading...");
+        return;
+    }
+
     painter.translate(0, -m_yOffset);
     QRect r(rect());
     r.translate(0, m_yOffset);
@@ -69,17 +62,19 @@ void Widget::paintEvent(QPaintEvent*)
 
 void Widget::keyPressEvent(QKeyEvent *event)
 {
-    if (event->key() == Qt::Key_Right) {
-        setChapter(m_currentChapter + 1);
-    } else if (event->key() == Qt::Key_Left) {
-        setChapter(m_currentChapter - 1);
-    } else if (event->key() == Qt::Key_Up) {
+    if (event->key() == Qt::Key_Up) {
         scroll(-20);
     } else if (event->key() == Qt::Key_Down) {
         scroll(20);
     } else if (event->key() == Qt::Key_PageUp) {
-        scroll(-m_document->pageSize().height());
+        scrollPage(-1);
     } else if (event->key() == Qt::Key_PageDown) {
-        scroll(m_document->pageSize().height());
+        scrollPage(1);
     }
+}
+
+void Widget::resizeEvent(QResizeEvent *)
+{
+    m_document->setPageSize(size());
+    update();
 }

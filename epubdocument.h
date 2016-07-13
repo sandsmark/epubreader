@@ -1,26 +1,40 @@
 #ifndef EPUBDOCUMENT_H
 #define EPUBDOCUMENT_H
 
+#include "epubcontainer.h"
 #include <QObject>
 #include <QTextDocument>
 
-#include "epubcontainer.h"
 
 class EPubContainer;
 
 class EPubDocument : public QTextDocument
 {
-public:
-    explicit EPubDocument(EPubContainer *container, QObject *parent = nullptr);
+    Q_OBJECT
 
-    void setChapter(const QString &id);
+public:
+    explicit EPubDocument();
+    virtual ~EPubDocument();
+
+    bool loaded() { return m_loaded; }
+
+    void openDocument(const QString &path);
+
+signals:
+    void loadCompleted();
 
 protected:
-    QVariant loadResource(int type, const QUrl &name) override;
+    virtual QVariant loadResource(int type, const QUrl &name) override;
+
+private slots:
+    void loadDocument();
 
 private:
+    QString m_documentPath;
     EPubContainer *m_container;
     EpubItem m_currentItem;
+
+    bool m_loaded;
 };
 
 #endif // EPUBDOCUMENT_H

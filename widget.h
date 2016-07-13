@@ -14,17 +14,15 @@ public:
     Widget(QWidget *parent = 0);
     ~Widget();
 
-    void openPage(int page);
-
-    void setChapter(int chapter);
     void scroll(int amount);
+    void scrollPage(int amount);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
-    EPubContainer *m_parser;
     QImage m_cover;
     EPubDocument *m_document;
     int m_currentChapter;
