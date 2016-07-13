@@ -6,6 +6,7 @@
 #include <QSet>
 #include <QVector>
 #include <QDomNode>
+#include <QMimeDatabase>
 
 class KZip;
 class KArchiveDirectory;
@@ -14,7 +15,7 @@ class QXmlStreamReader;
 
 struct EpubItem {
     QString path;
-    QString mimetype;
+    QByteArray mimetype;
 };
 
 struct EpubPageReference {
@@ -53,6 +54,8 @@ public:
     ~EPubParser();
 
     bool loadFile(const QString path);
+    QImage getImage(const QString &id);
+    QString getMetadata(const QString &key);
 
 signals:
     void errorHappened(const QString &error);
@@ -81,6 +84,7 @@ private:
 
     QHash<EpubPageReference::StandardType, EpubPageReference> m_standardReferences;
     QHash<QString, EpubPageReference> m_otherReferences;
+    QMimeDatabase m_mimeDatabase;
 };
 
 #endif // EPUBPARSER_H

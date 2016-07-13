@@ -2,6 +2,7 @@
 
 #include "epubparser.h"
 #include <QDebug>
+#include <QPainter>
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent),
@@ -12,10 +13,23 @@ Widget::Widget(QWidget *parent)
     });
     setWindowFlags(Qt::Dialog);
     resize(600, 800);
-    m_parser->loadFile("Lorem Ipsum.epub");
+    if (!m_parser->loadFile("test.epub")) {
+        return;
+    }
+
+    QString coverId = m_parser->getMetadata("cover");
+    if (!coverId.isEmpty()) {
+        m_cover = m_parser->getImage(coverId);
+    }
 }
 
 Widget::~Widget()
 {
 
+}
+
+void Widget::paintEvent(QPaintEvent*)
+{
+    QPainter painter(this);
+    painter.drawImage(rect(), m_cover);
 }

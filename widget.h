@@ -13,8 +13,12 @@ public:
     Widget(QWidget *parent = 0);
     ~Widget();
 
+protected:
+    void paintEvent(QPaintEvent *event) override;
+
 private:
     EPubParser *m_parser;
+    QImage m_cover;
 };
 
 #endif // WIDGET_H

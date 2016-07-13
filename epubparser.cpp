@@ -8,6 +8,8 @@
 #include <QXmlStreamReader>
 #include <QDomDocument>
 #include <QDir>
+#include <QImage>
+#include <QImageReader>
 
 #define METADATA_FOLDER "META-INF"
 #define MIMETYPE_FILE "mimetype"
@@ -54,6 +56,37 @@ bool EPubParser::loadFile(const QString path)
     }
 
     return true;
+}
+
+QImage EPubParser::getImage(const QString &id)
+{
+    if (!m_items.contains(id)) {
+        qWarning() << "Asked for unknown item" << id;
+        return QImage();
+    }
+
+    const EpubItem &item = m_items.value(id);
+
+    if (!QImageReader::supportedMimeTypes().contains(item.mimetype)) {
+        qWarning() << "Asked for unsupported type" << item.mimetype;
+        return QImage();
+    }
+
+    QString path = item.path;
+
+    const KArchiveFile *file = getFile(path);
+    if (!file) {
+        emit errorHappened(tr("Unable to open file %1").arg(path));
+        return QImage();
+    }
+    QScopedPointer<QIODevice> ioDevice(file->createDevice());
+
+    return QImage::fromData(ioDevice->readAll());
+}
+
+QString EPubParser::getMetadata(const QString &key)
+{
+    return m_metadata.value(key);
 }
 
 bool EPubParser::parseMimetype()
@@ -232,7 +265,7 @@ bool EPubParser::parseManifestItem(const QDomNode &manifestNode, const QString c
     path = QDir::cleanPath(currentFolder + '/' + path);
 
     EpubItem item;
-    item.mimetype  = type;
+    item.mimetype  = type.toUtf8();
     item.path = path;
     m_items[id] = item;
 
@@ -275,7 +308,7 @@ bool EPubParser::parseGuideItem(const QDomNode &guideItem)
     QDomElement guideElement = guideItem.toElement();
     QString target = guideElement.attribute("href");
     QString title = guideElement.attribute("title");
-    QString type = guideElement.attribute("title");
+    QString type = guideElement.attribute("type");
 
     if (target.isEmpty() || title.isEmpty() || type.isEmpty()) {
         qWarning() << "Invalid guide item" << target << title << type;
