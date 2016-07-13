@@ -13,7 +13,7 @@ Widget::Widget(QWidget *parent)
     });
     setWindowFlags(Qt::Dialog);
     resize(600, 800);
-    if (!m_parser->loadFile("test.epub")) {
+    if (!m_parser->openFile("test.epub")) {
         return;
     }
 

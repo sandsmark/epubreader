@@ -53,7 +53,9 @@ public:
     explicit EPubParser(QObject *parent = 0);
     ~EPubParser();
 
-    bool loadFile(const QString path);
+    bool openFile(const QString path);
+
+    QSharedPointer<QIODevice> getIoDevice(const QString &id);
     QImage getImage(const QString &id);
     QString getMetadata(const QString &key);
 

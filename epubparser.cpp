@@ -26,9 +26,7 @@ EPubParser::~EPubParser()
     delete m_archive;
 }
 
-
-
-bool EPubParser::loadFile(const QString path)
+bool EPubParser::openFile(const QString path)
 {
     delete m_archive;
 
@@ -57,6 +55,24 @@ bool EPubParser::loadFile(const QString path)
     return true;
 }
 
+QSharedPointer<QIODevice> EPubParser::getIoDevice(const QString &id)
+{
+    if (!m_items.contains(id)) {
+        qWarning() << "Asked for unknown item" << id;
+        return QSharedPointer<QIODevice>();
+    }
+
+    const EpubItem &item = m_items.value(id);
+
+    const KArchiveFile *file = getFile(item.path);
+    if (!file) {
+        emit errorHappened(tr("Unable to open file %1").arg(item.path));
+        return QSharedPointer<QIODevice>();
+    }
+
+    return QSharedPointer<QIODevice>(file->createDevice());
+}
+
 QImage EPubParser::getImage(const QString &id)
 {
     if (!m_items.contains(id)) {
@@ -71,14 +87,11 @@ QImage EPubParser::getImage(const QString &id)
         return QImage();
     }
 
-    QString path = item.path;
+    QSharedPointer<QIODevice> ioDevice = getIoDevice(id);
 
-    const KArchiveFile *file = getFile(path);
-    if (!file) {
-        emit errorHappened(tr("Unable to open file %1").arg(path));
+    if (!ioDevice) {
         return QImage();
     }
-    QScopedPointer<QIODevice> ioDevice(file->createDevice());
 
     return QImage::fromData(ioDevice->readAll());
 }
