@@ -5,7 +5,6 @@
 
 #include <QDebug>
 #include <QScopedPointer>
-#include <QXmlStreamReader>
 #include <QDomDocument>
 #include <QDir>
 #include <QImage>
@@ -123,30 +122,32 @@ bool EPubParser::parseContainer()
     QScopedPointer<QIODevice> ioDevice(containerFile->createDevice());
     Q_ASSERT(ioDevice);
 
-    QXmlStreamReader xmlReader(ioDevice.data());
-
-    QString rootfilePath;
-    while (!xmlReader.atEnd()) {
-        if (!xmlReader.readNextStartElement()) {
+    // The only thing we need from this file is the path to the root file
+    QDomDocument document;
+    document.setContent(ioDevice.data());
+    QDomNodeList rootNodes = document.elementsByTagName("rootfile");
+    for (int i=0; i<rootNodes.count(); i++) {
+        QDomElement rootElement = rootNodes.at(i).toElement();
+        QString rootfilePath = rootElement.attribute("full-path");
+        if (rootfilePath.isEmpty()) {
+            qWarning() << "Invalid root file entry";
             continue;
         }
-
-        if (xmlReader.name() == QStringLiteral("rootfile")) {
-            rootfilePath = xmlReader.attributes().value("full-path").toString();
-            break;
+        if (parseContentFile(rootfilePath)) {
+            return true;
         }
     }
 
-    if (xmlReader.hasError()) {
-        emit errorHappened(tr("Error while parsing container: %1").arg(xmlReader.errorString()));
-        return false;
-    }
+    // Limitations:
+    //  - We only read one rootfile
+    //  - We don't read the following from META-INF/
+    //     - manifest.xml (unknown contents, just reserved)
+    //     - metadata.xml (unused according to spec, just reserved)
+    //     - rights.xml (reserved for DRM, not standardized)
+    //     - signatures.xml (signatures for files, standardized)
 
-    if (rootfilePath.isEmpty()) {
-        emit errorHappened(tr("Unable to find root file in container"));
-    }
-
-    return parseContentFile(rootfilePath);
+    emit errorHappened(tr("Unable to find and use any content files"));
+    return false;
 }
 
 bool EPubParser::parseContentFile(const QString filepath)
