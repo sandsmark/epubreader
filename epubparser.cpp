@@ -5,6 +5,7 @@
 
 #include <QDebug>
 #include <QScopedPointer>
+#include <QXmlStreamReader>
 #include <QDomDocument>
 #include <QDir>
 
@@ -89,30 +90,85 @@ bool EPubParser::parseContainer()
     QScopedPointer<QIODevice> ioDevice(containerFile->createDevice());
     Q_ASSERT(ioDevice);
 
-    QDomDocument doc;
-    doc.setContent(ioDevice.data());
+    QXmlStreamReader xmlReader(ioDevice.data());
 
-    QDomNodeList nodes = doc.elementsByTagName("rootfile");
-    if (nodes.count() != 1){
-        emit errorHappened(tr("Malformed metadata, unable to find content metadata"));
+    QString rootfilePath;
+    while (!xmlReader.atEnd()) {
+        if (!xmlReader.readNextStartElement()) {
+            continue;
+        }
+
+        if (xmlReader.name() == QStringLiteral("rootfile")) {
+            rootfilePath = xmlReader.attributes().value("full-path").toString();
+            break;
+        }
+    }
+
+    if (xmlReader.hasError()) {
+        emit errorHappened(tr("Error while parsing container: %1").arg(xmlReader.errorString()));
         return false;
     }
 
-    QDomNode pathAttribute = nodes.at(0).attributes().namedItem("full-path");
-    QString rootfilePath = QDir::cleanPath(pathAttribute.nodeValue());
     if (rootfilePath.isEmpty()) {
-        emit errorHappened(tr("Malformed metadata, unable to get content metadata path"));
-        return false;
+        emit errorHappened(tr("Unable to find root file in container"));
     }
 
+    return parseContentFile(rootfilePath);
+}
 
-    const KArchiveFile *rootFile = getFile(rootfilePath);
+bool EPubParser::parseContentFile(const QString filepath)
+{
+    const KArchiveFile *rootFile = getFile(filepath);
     if (!rootFile) {
         emit errorHappened(tr("Malformed metadata, unable to get content metadata path"));
         return false;
     }
-    QScopedPointer<QIODevice> rootDevice(rootFile->createDevice());
+    QScopedPointer<QIODevice> ioDevice(rootFile->createDevice());
+    QDomDocument document;
+    document.setContent(ioDevice.data(), true); // turn on namespace processing
 
+    QDomNodeList metadataNodeList = document.elementsByTagName("metadata");
+    for (int i=0; i<metadataNodeList.count(); i++) {
+        QDomNodeList metadataChildList = metadataNodeList.at(i).childNodes();
+        for (int j=0; j<metadataChildList.count(); j++) {
+            parseMetadata(metadataChildList.at(j));
+        }
+    }
+
+    return true;
+}
+
+bool EPubParser::parseMetadata(const QDomNode &metadataNode)
+{
+    if (!metadataNode.isElement()) {
+        qWarning() << metadataNode.localName() << "was not an element!";
+        qWarning() << "at line" << metadataNode.lineNumber();
+        return false;
+    }
+    QDomElement metadataElement = metadataNode.toElement();
+    QString tagName = metadataElement.tagName();
+
+    QString metaName;
+    QString metaValue;
+
+    if (tagName == "meta") {
+        metaName = metadataElement.attribute("name");
+        metaValue = metadataElement.attribute("content");
+    } else if (metadataElement.prefix() != "dc") {
+        qWarning() << "Unsupported metadata tag" << tagName;
+        return false;
+    } else if (tagName == "date") {
+        metaName = metadataElement.attribute("event");
+        metaValue = metadataElement.text();
+    } else {
+        metaName = tagName;
+        metaValue = metadataElement.text();
+    }
+
+    if (metaName.isEmpty() || metaValue.isEmpty()) {
+        return false;
+    }
+    m_metadata[metaName] = metaValue;
 
     return true;
 }
