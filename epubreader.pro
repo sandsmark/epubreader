@@ -17,7 +17,9 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         widget.cpp \
-    epubcontainer.cpp
+    epubcontainer.cpp \
+    epubdocument.cpp
 
 HEADERS  += widget.h \
-    epubcontainer.h
+    epubcontainer.h \
+    epubdocument.h

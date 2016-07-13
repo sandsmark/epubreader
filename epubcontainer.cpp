@@ -56,18 +56,11 @@ bool EPubContainer::openFile(const QString path)
     return true;
 }
 
-QSharedPointer<QIODevice> EPubContainer::getIoDevice(const QString &id)
+QSharedPointer<QIODevice> EPubContainer::getIoDevice(const QString &path)
 {
-    if (!m_items.contains(id)) {
-        qWarning() << "Asked for unknown item" << id;
-        return QSharedPointer<QIODevice>();
-    }
-
-    const EpubItem &item = m_items.value(id);
-
-    const KArchiveFile *file = getFile(item.path);
+    const KArchiveFile *file = getFile(path);
     if (!file) {
-        emit errorHappened(tr("Unable to open file %1").arg(item.path));
+        emit errorHappened(tr("Unable to open file %1").arg(path));
         return QSharedPointer<QIODevice>();
     }
 
@@ -88,7 +81,7 @@ QImage EPubContainer::getImage(const QString &id)
         return QImage();
     }
 
-    QSharedPointer<QIODevice> ioDevice = getIoDevice(id);
+    QSharedPointer<QIODevice> ioDevice = getIoDevice(item.path);
 
     if (!ioDevice) {
         return QImage();

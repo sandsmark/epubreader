@@ -55,9 +55,12 @@ public:
 
     bool openFile(const QString path);
 
-    QSharedPointer<QIODevice> getIoDevice(const QString &id);
+    EpubItem getEpubItem(const QString &id) const { return m_items.value(id); }
+
+    QSharedPointer<QIODevice> getIoDevice(const QString &path);
     QImage getImage(const QString &id);
     QString getMetadata(const QString &key);
+    QStringList getItems() { return m_orderedItems; }
 
 signals:
     void errorHappened(const QString &error);
@@ -81,7 +84,7 @@ private:
     QHash<QString, QString> m_metadata;
 
     QHash<QString, EpubItem> m_items;
-    QVector<QString> m_orderedItems;
+    QStringList m_orderedItems;
     QSet<QString> m_unorderedItems;
 
     QHash<EpubPageReference::StandardType, EpubPageReference> m_standardReferences;
