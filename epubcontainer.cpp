@@ -339,6 +339,10 @@ bool EPubContainer::parseGuideItem(const QDomNode &guideItem)
 
 const KArchiveFile *EPubContainer::getFile(const QString &path)
 {
+    if (path.isEmpty()) {
+        return nullptr;
+    }
+
     const KArchiveDirectory *folder = m_rootFolder;
 
     // Try to walk down the correct path
@@ -359,7 +363,13 @@ const KArchiveFile *EPubContainer::getFile(const QString &path)
         Q_ASSERT(folder);
     }
 
-    QString filename = pathParts.last();
+    QString filename;
+    if (pathParts.isEmpty()) {
+        filename = path;
+    } else {
+        filename = pathParts.last();
+    }
+
     const KArchiveFile *file = folder->file(filename);
     if (!file) {
         qWarning() << "Unable to find file" << filename << "in" << folder->name();
