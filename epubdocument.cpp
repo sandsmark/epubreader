@@ -39,25 +39,25 @@ void EPubDocument::loadDocument()
         return;
     }
     QTextCursor cursor(this);
-    cursor.movePosition(QTextCursor::End);
+//    cursor.movePosition(QTextCursor::Start);
 
     QStringList items = m_container->getItems();
-
-    QString cover = m_container->getStandardPage(EpubPageReference::CoverPage);
-    if (!cover.isEmpty()) {
-        items.prepend(cover);
-        qDebug() << cover;
-    }
 
     QDomDocument newDocument;
     bool isFirst = true;
 
     QDomNode bodyElement;
+    QString currentHeader;
+    int cutit = 7;
     for (const QString &chapter : items) {
+        if (!--cutit) {
+            break;
+        }
         m_currentItem = m_container->getEpubItem(chapter);
         if (m_currentItem.path.isEmpty()) {
             continue;
         }
+        qDebug() << m_currentItem.path;
 
         QSharedPointer<QIODevice> ioDevice = m_container->getIoDevice(m_currentItem.path);
         if (!ioDevice) {
@@ -66,9 +66,26 @@ void EPubDocument::loadDocument()
         }
 
         QByteArray data = ioDevice->readAll();
+        QDomDocument document;
+        document.setContent(data);
+
+        // Serialize out header to compare
+        QString newHeader = getHeader(document);
+        if (!isFirst && newHeader != currentHeader) {
+            fixImages(newDocument);
+            qDebug().noquote() << newDocument.toString(2);
+            cursor.insertHtml(newDocument.toString());
+            newDocument.clear();
+            isFirst = true;
+
+            QTextBlockFormat pageBreak;
+            pageBreak.setPageBreakPolicy(QTextFormat::PageBreak_AlwaysBefore);
+            cursor.insertBlock(pageBreak);
+        }
+
 
         if (isFirst) {
-            newDocument.setContent(data);
+            newDocument = document;
             isFirst = false;
             QDomNodeList bodies = newDocument.elementsByTagName("body");
             if (bodies.count() != 1) {
@@ -76,12 +93,16 @@ void EPubDocument::loadDocument()
                 return;
             }
             bodyElement = bodies.at(0);
+            currentHeader = newHeader;
+
             continue;
         }
 
-        QDomDocument oldDocument;
-        oldDocument.setContent(data);
-        QDomNodeList bodies = oldDocument.elementsByTagName("body");
+        QDomElement pageBreakElement = newDocument.createElement("p");
+        pageBreakElement.setAttribute("style", "page-break-after:always");
+        bodyElement.appendChild(pageBreakElement);
+
+        QDomNodeList bodies = document.elementsByTagName("body");
         if (bodies.count() != 1) {
             qWarning() << "Invalid number of bodies in old";
             continue;
@@ -89,13 +110,16 @@ void EPubDocument::loadDocument()
         QDomNode newBodyNode = newDocument.importNode(bodies.at(0), true);
         QDomNodeList contents = newBodyNode.childNodes();
         for (int i=0; i<contents.count(); i++) {
-            bodyElement.appendChild(contents.at(i));
+            bodyElement.appendChild(contents.at(i).cloneNode(true));
         }
+
     }
-
     fixImages(newDocument);
+    cursor.insertHtml(newDocument.toString(-1));
+    qDebug().noquote() << newDocument.toString(2);
 
-    setHtml(newDocument.toString(-1));
+
+//    setHtml(newDocument.toString(-1));
 
     qDebug() << blockCount();
     m_loaded = true;
@@ -128,7 +152,7 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
 
         // Serialize out the old SVG, store it
         QDomDocument tempDocument;
-        tempDocument.appendChild(tempDocument.importNode(svgNode, true));
+        tempDocument.appendChild(tempDocument.importNode(svgNode, true).cloneNode(true));
         QString svgPlaceholderPath = "__SVG_PLACEHOLDER_" + QString::number(++svgCounter) + ".svg";
         m_svgs.insert(svgPlaceholderPath, tempDocument.toByteArray());
 
@@ -139,15 +163,12 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
         // We can't handle percentages
         if (width.endsWith("%")) {
             width.chop(1);
-            qDebug() << width;
-            width = QString::number(pageSize().width() * width.toInt() / 100);
-            qDebug() << width;
+            width = QString::number(pageSize().width() * width.toInt() / 100 - 40);
         }
+
         if (height.endsWith("%")) {
             height.chop(1);
-            qDebug() << height;
-            height = QString::number(pageSize().height() * height.toInt() / 100);
-            qDebug() << height;
+            height = QString::number(pageSize().height() * height.toInt() / 100 - 40);
         }
 
         // Create <img> node pointing to our SVG image
@@ -159,12 +180,28 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
         // Replace <svg> node with our <img> node
         QDomNode parent = svgNodes.at(i).parentNode();
         parent.replaceChild(imageElement, svgNode);
+
+        QDomElement breakElement = newDocument.createElement("br");
+        parent.appendChild(breakElement);
     }
+}
+
+QString EPubDocument::getHeader(const QDomDocument &document)
+{
+    QDomNodeList headerNodes = document.elementsByTagName("head");
+    if (headerNodes.isEmpty()) {
+        qWarning() << "No header found";
+        return QString();
+    }
+    QDomDocument headerDocument;
+    headerDocument.appendChild(headerDocument.importNode(headerNodes.at(0), true));
+    return headerDocument.toString(-1);
 }
 
 QVariant EPubDocument::loadResource(int type, const QUrl &name)
 {
     Q_UNUSED(type);
+//    qDebug() << name;
 
     QString path = name.path();
     if (m_svgs.contains(path)) {
