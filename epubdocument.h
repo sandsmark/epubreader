@@ -30,6 +30,10 @@ private slots:
     void loadDocument();
 
 private:
+    void fixImages(QDomDocument &newDocument);
+
+    QHash<QString, QByteArray> m_svgs;
+
     QString m_documentPath;
     EPubContainer *m_container;
     EpubItem m_currentItem;

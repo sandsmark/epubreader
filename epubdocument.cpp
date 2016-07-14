@@ -6,6 +6,7 @@
 #include <QTextCursor>
 #include <QThread>
 #include <QElapsedTimer>
+#include <QDomDocument>
 
 EPubDocument::EPubDocument() : QTextDocument(),
     m_container(nullptr),
@@ -60,7 +61,12 @@ void EPubDocument::loadDocument()
             qWarning() << "Unable to get iodevice for chapter" << chapter;
             continue;
         }
-        cursor.insertHtml(ioDevice->readAll());
+
+        QByteArray data = ioDevice->readAll();
+        QDomDocument newDocument;
+        newDocument.setContent(data);
+        fixImages(newDocument);
+        cursor.insertHtml(newDocument.toString());
 
         QTextBlockFormat pageBreak;
         pageBreak.setPageBreakPolicy(QTextFormat::PageBreak_AlwaysBefore);
@@ -73,11 +79,72 @@ void EPubDocument::loadDocument()
     qDebug() << "Done in" << timer.elapsed() << "ms";
 }
 
+void EPubDocument::fixImages(QDomDocument &newDocument)
+{
+    // QImage which QtSvg uses isn't able to read files from inside the archive, so embed image data inline
+    QDomNodeList imageNodes = newDocument.elementsByTagName("image"); // SVG images
+    for (int i=0; i<imageNodes.count(); i++) {
+        QDomElement image = imageNodes.at(i).toElement();
+        if (!image.hasAttribute("xlink:href")) {
+            continue;
+        }
+        QString path = image.attribute("xlink:href");
+        QByteArray fileData = loadResource(0, QUrl(path)).toByteArray();
+        QByteArray data = "data:image/jpeg;base64," +fileData.toBase64();
+        image.setAttribute("xlink:href", QString::fromLatin1(data));
+    }
+
+    int svgCounter = 0;
+
+    // QTextDocument isn't fond of SVGs, so rip them out and store them separately, and give it <img> instead
+    QDomNodeList svgNodes = newDocument.elementsByTagName("svg");
+    for (int i=0; i<svgNodes.count(); i++) {
+        QDomElement svgNode = svgNodes.at(i).toElement();
+
+        // Serialize out the old SVG, store it
+        QDomDocument tempDocument;
+        tempDocument.appendChild(tempDocument.importNode(svgNode, true));
+        QString svgPlaceholderPath = "__SVG_PLACEHOLDER_" + QString::number(++svgCounter) + ".svg";
+        m_svgs.insert(svgPlaceholderPath, tempDocument.toByteArray());
+
+        // For now these are the only properties we keep
+        QString width = svgNode.attribute("width");
+        QString height = svgNode.attribute("height");
+
+        // We can't handle percentages
+        if (width.endsWith("%")) {
+            width.chop(1);
+            qDebug() << width;
+            width = QString::number(pageSize().width() * width.toInt() / 100);
+            qDebug() << width;
+        }
+        if (height.endsWith("%")) {
+            height.chop(1);
+            qDebug() << height;
+            height = QString::number(pageSize().height() * height.toInt() / 100);
+            qDebug() << height;
+        }
+
+        // Create <img> node pointing to our SVG image
+        QDomElement imageElement = newDocument.createElement("img");
+        imageElement.setAttribute("width", width);
+        imageElement.setAttribute("height", height);
+        imageElement.setAttribute("src", svgPlaceholderPath);
+
+        // Replace <svg> node with our <img> node
+        QDomNode parent = svgNodes.at(i).parentNode();
+        parent.replaceChild(imageElement, svgNode);
+    }
+}
+
 QVariant EPubDocument::loadResource(int type, const QUrl &name)
 {
     Q_UNUSED(type);
 
     QString path = name.path();
+    if (m_svgs.contains(path)) {
+        return m_svgs.value(path);
+    }
 
     QString contentFileFolder;
     int separatorIndex = m_currentItem.path.lastIndexOf('/');
