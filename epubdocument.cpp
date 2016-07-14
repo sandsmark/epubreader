@@ -40,7 +40,6 @@ void EPubDocument::loadDocument()
     }
     QTextCursor cursor(this);
     cursor.movePosition(QTextCursor::End);
-    qDebug() << m_container->getItems().count();
 
     QStringList items = m_container->getItems();
 
@@ -50,6 +49,10 @@ void EPubDocument::loadDocument()
         qDebug() << cover;
     }
 
+    QDomDocument newDocument;
+    bool isFirst = true;
+
+    QDomNode bodyElement;
     for (const QString &chapter : items) {
         m_currentItem = m_container->getEpubItem(chapter);
         if (m_currentItem.path.isEmpty()) {
@@ -63,15 +66,37 @@ void EPubDocument::loadDocument()
         }
 
         QByteArray data = ioDevice->readAll();
-        QDomDocument newDocument;
-        newDocument.setContent(data);
-        fixImages(newDocument);
-        cursor.insertHtml(newDocument.toString());
 
-        QTextBlockFormat pageBreak;
-        pageBreak.setPageBreakPolicy(QTextFormat::PageBreak_AlwaysBefore);
-        cursor.insertBlock(pageBreak);
+        if (isFirst) {
+            newDocument.setContent(data);
+            isFirst = false;
+            QDomNodeList bodies = newDocument.elementsByTagName("body");
+            if (bodies.count() != 1) {
+                qWarning() << "Invalid number of bodies";
+                return;
+            }
+            bodyElement = bodies.at(0);
+            continue;
+        }
+
+        QDomDocument oldDocument;
+        oldDocument.setContent(data);
+        QDomNodeList bodies = oldDocument.elementsByTagName("body");
+        if (bodies.count() != 1) {
+            qWarning() << "Invalid number of bodies in old";
+            continue;
+        }
+        QDomNode newBodyNode = newDocument.importNode(bodies.at(0), true);
+        QDomNodeList contents = newBodyNode.childNodes();
+        for (int i=0; i<contents.count(); i++) {
+            bodyElement.appendChild(contents.at(i));
+        }
     }
+
+    fixImages(newDocument);
+
+    setHtml(newDocument.toString(-1));
+
     qDebug() << blockCount();
     m_loaded = true;
 
