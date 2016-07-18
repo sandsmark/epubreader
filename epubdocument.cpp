@@ -50,6 +50,8 @@ void EPubDocument::loadDocument()
         qDebug() << cover;
     }
 
+    QTextBlockFormat pageBreak;
+    pageBreak.setPageBreakPolicy(QTextFormat::PageBreak_AlwaysBefore);
     for (const QString &chapter : items) {
         m_currentItem = m_container->getEpubItem(chapter);
         if (m_currentItem.path.isEmpty()) {
@@ -68,8 +70,6 @@ void EPubDocument::loadDocument()
         fixImages(newDocument);
         cursor.insertHtml(newDocument.toString());
 
-        QTextBlockFormat pageBreak;
-        pageBreak.setPageBreakPolicy(QTextFormat::PageBreak_AlwaysBefore);
         cursor.insertBlock(pageBreak);
     }
     qDebug() << blockCount();
@@ -94,7 +94,7 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
         image.setAttribute("xlink:href", QString::fromLatin1(data));
     }
 
-    int svgCounter = 0;
+    static int svgCounter = 0;
 
     // QTextDocument isn't fond of SVGs, so rip them out and store them separately, and give it <img> instead
     QDomNodeList svgNodes = newDocument.elementsByTagName("svg");
@@ -160,6 +160,7 @@ QVariant EPubDocument::loadResource(int type, const QUrl &name)
         return QVariant();
     }
     QByteArray data = ioDevice->readAll();
+
     return data;
 }
 
