@@ -115,13 +115,13 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
         if (width.endsWith("%")) {
             width.chop(1);
             qDebug() << width;
-            width = QString::number(pageSize().width() * width.toInt() / 100);
+            width = QString::number(pageSize().width() * width.toInt() / 100 - 40);
             qDebug() << width;
         }
         if (height.endsWith("%")) {
             height.chop(1);
             qDebug() << height;
-            height = QString::number(pageSize().height() * height.toInt() / 100);
+            height = QString::number(pageSize().height() * height.toInt() / 100 - 40);
             qDebug() << height;
         }
 
