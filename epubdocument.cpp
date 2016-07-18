@@ -7,6 +7,8 @@
 #include <QThread>
 #include <QElapsedTimer>
 #include <QDomDocument>
+#include <QSvgRenderer>
+#include <QPainter>
 
 EPubDocument::EPubDocument() : QTextDocument(),
     m_container(nullptr),
@@ -109,8 +111,8 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
         // Serialize out the old SVG, store it
         QDomDocument tempDocument;
         tempDocument.appendChild(tempDocument.importNode(svgNode, true));
-        QString svgPlaceholderPath = "__SVG_PLACEHOLDER_" + QString::number(++svgCounter) + ".svg";
-        m_svgs.insert(svgPlaceholderPath, tempDocument.toByteArray());
+        QString svgId = QString::number(++svgCounter);// + ".svg";
+        m_svgs.insert(svgId, tempDocument.toByteArray());
 
         // For now these are the only properties we keep
         QString width = svgNode.attribute("width");
@@ -132,9 +134,7 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
 
         // Create <img> node pointing to our SVG image
         QDomElement imageElement = newDocument.createElement("img");
-        imageElement.setAttribute("width", width);
-        imageElement.setAttribute("height", height);
-        imageElement.setAttribute("src", svgPlaceholderPath);
+        imageElement.setAttribute("src", "svgcache:" + svgId);
 
         // Replace <svg> node with our <img> node
         QDomNode parent = svgNodes.at(i).parentNode();
@@ -142,18 +142,50 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
     }
 }
 
-QVariant EPubDocument::loadResource(int type, const QUrl &name)
+const QImage &EPubDocument::getSvgImage(const QString &id)
+{
+    if (m_renderedSvgs.contains(id)) {
+        return m_renderedSvgs[id];
+    }
+    if (!m_svgs.contains(id)) {
+        qWarning() << "Couldn't find SVG" << id;
+        static QImage nullImg;
+        return nullImg;
+    }
+
+    QSize imageSize(pageSize().width() - documentMargin() * 4,
+                    pageSize().height() - documentMargin() * 4);
+
+
+    QSvgRenderer renderer(m_svgs.value(id));
+    QSize svgSize(renderer.viewBox().size());
+
+    if (svgSize.isValid()) {
+        svgSize.scale(imageSize, Qt::KeepAspectRatio);
+    } else {
+        svgSize = imageSize;
+    }
+
+    QImage rendered(svgSize, QImage::Format_ARGB32);
+    QPainter painter(&rendered);
+    renderer.render(&painter);
+    painter.end();
+
+    m_renderedSvgs.insert(id, rendered);
+    return m_renderedSvgs[id];
+}
+
+QVariant EPubDocument::loadResource(int type, const QUrl &url)
 {
     Q_UNUSED(type);
 
-    const QString path = name.path();
-    if (m_svgs.contains(path)) {
-        return m_svgs.value(path);
+    if (url.scheme() == "svgcache") {
+        return getSvgImage(url.path());
     }
 
-    QSharedPointer<QIODevice> ioDevice = m_container->getIoDevice(path);
+    QSharedPointer<QIODevice> ioDevice = m_container->getIoDevice(url.path());
     if (!ioDevice) {
-        qWarning() << "Unable to get io device for" << path;
+        qWarning() << "Unable to get io device for" << url;
         return QVariant();
     }
     QByteArray data = ioDevice->readAll();

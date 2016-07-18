@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui xml widgets
+QT       += core gui xml widgets svg
 CONFIG   += c++11
 
 QT       += KArchive

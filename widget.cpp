@@ -75,6 +75,7 @@ void Widget::keyPressEvent(QKeyEvent *event)
 
 void Widget::resizeEvent(QResizeEvent *)
 {
+    m_document->clearCache();
     m_document->setPageSize(size());
     update();
 }
