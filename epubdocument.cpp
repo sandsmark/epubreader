@@ -42,7 +42,6 @@ void EPubDocument::loadDocument()
     }
     QTextCursor cursor(this);
     cursor.movePosition(QTextCursor::End);
-    qDebug() << m_container->getItems().count();
 
     QStringList items = m_container->getItems();
 
@@ -79,7 +78,6 @@ void EPubDocument::loadDocument()
 
         cursor.insertBlock(pageBreak);
     }
-    qDebug() << blockCount();
     m_loaded = true;
 
     emit loadCompleted();
@@ -189,6 +187,8 @@ QVariant EPubDocument::loadResource(int type, const QUrl &url)
         return QVariant();
     }
     QByteArray data = ioDevice->readAll();
+
+    addResource(type, url, data);
 
     return data;
 }
