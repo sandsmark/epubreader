@@ -65,6 +65,11 @@ void EPubDocument::loadDocument()
         }
 
         QByteArray data = ioDevice->readAll();
+        if (data.isEmpty()) {
+            qWarning() << "Got an empty document";
+            continue;
+        }
+        setBaseUrl(QUrl(m_currentItem.path));
         QDomDocument newDocument;
         newDocument.setContent(data);
         fixImages(newDocument);
@@ -141,18 +146,10 @@ QVariant EPubDocument::loadResource(int type, const QUrl &name)
 {
     Q_UNUSED(type);
 
-    QString path = name.path();
+    const QString path = name.path();
     if (m_svgs.contains(path)) {
         return m_svgs.value(path);
     }
-
-    QString contentFileFolder;
-    int separatorIndex = m_currentItem.path.lastIndexOf('/');
-    if (separatorIndex > 0) {
-        contentFileFolder = m_currentItem.path.left(separatorIndex + 1);
-    }
-
-    path = QDir::cleanPath(contentFileFolder + path);
 
     QSharedPointer<QIODevice> ioDevice = m_container->getIoDevice(path);
     if (!ioDevice) {
