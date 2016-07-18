@@ -5,6 +5,11 @@
 #-------------------------------------------------
 
 QT       += core gui xml widgets svg
+
+## For debugging CSS
+# QT += gui-private
+# DEFINES += DEBUG_CSS
+
 CONFIG   += c++11
 
 QT       += KArchive

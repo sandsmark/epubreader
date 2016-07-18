@@ -9,6 +9,11 @@
 #include <QDomDocument>
 #include <QSvgRenderer>
 #include <QPainter>
+#include <QTextBlock>
+
+#ifdef DEBUG_CSS
+#include <private/qcssparser_p.h>
+#endif
 
 EPubDocument::EPubDocument() : QTextDocument(),
     m_container(nullptr),
@@ -112,24 +117,6 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
         QString svgId = QString::number(++svgCounter);// + ".svg";
         m_svgs.insert(svgId, tempDocument.toByteArray());
 
-        // For now these are the only properties we keep
-        QString width = svgNode.attribute("width");
-        QString height = svgNode.attribute("height");
-
-        // We can't handle percentages
-        if (width.endsWith("%")) {
-            width.chop(1);
-            qDebug() << width;
-            width = QString::number(pageSize().width() * width.toInt() / 100 - 40);
-            qDebug() << width;
-        }
-        if (height.endsWith("%")) {
-            height.chop(1);
-            qDebug() << height;
-            height = QString::number(pageSize().height() * height.toInt() / 100 - 40);
-            qDebug() << height;
-        }
-
         // Create <img> node pointing to our SVG image
         QDomElement imageElement = newDocument.createElement("img");
         imageElement.setAttribute("src", "svgcache:" + svgId);
@@ -187,6 +174,20 @@ QVariant EPubDocument::loadResource(int type, const QUrl &url)
         return QVariant();
     }
     QByteArray data = ioDevice->readAll();
+
+    if (type == QTextDocument::StyleSheetResource) {
+        QString cssData = QString::fromLocal8Bit(data);
+        cssData.replace("@charset \"", "@charset\"");
+        data = cssData.toLocal8Bit();
+
+#ifdef DEBUG_CSS
+//        QCss::Parser parser(cssData);
+//        QCss::StyleSheet stylesheet;
+//        qDebug() << "Parse success?" << parser.parse(&stylesheet);
+//        qDebug().noquote() << parser.errorIndex << parser.errorSymbol().lexem();
+#endif
+
+    }
 
     addResource(type, url, data);
 
