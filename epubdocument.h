@@ -31,7 +31,6 @@ private slots:
 
 private:
     void fixImages(QDomDocument &newDocument);
-    QString getHeader(const QDomDocument &document);
 
     QHash<QString, QByteArray> m_svgs;
 
