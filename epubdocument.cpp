@@ -79,8 +79,8 @@ void EPubDocument::loadDocument()
         QDomDocument newDocument;
         newDocument.setContent(data);
         fixImages(newDocument);
-        cursor.insertHtml(newDocument.toString());
 
+        cursor.insertHtml(newDocument.toString());
         cursor.insertBlock(pageBreak);
     }
     m_loaded = true;

@@ -1,6 +1,9 @@
 #include "widget.h"
 
 #include "epubdocument.h"
+
+#include <QFileDialog>
+#include <QSettings>
 #include <QDebug>
 #include <QPainter>
 #include <QKeyEvent>
@@ -18,7 +21,13 @@ Widget::Widget(QWidget *parent)
     });
 
     m_document->setPageSize(size());
-    m_document->openDocument("test.epub");
+
+    QSettings settings;
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open epub"), settings.value("lastFile").toString(), tr("EPUB files (*.epub)"));
+    if (!fileName.isEmpty()) {
+        settings.setValue("lastFile", fileName);
+        m_document->openDocument(fileName);
+    }
 }
 
 Widget::~Widget()
