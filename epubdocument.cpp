@@ -83,6 +83,7 @@ void EPubDocument::loadDocument()
         cursor.insertHtml(newDocument.toString());
         cursor.insertBlock(pageBreak);
     }
+    setBaseUrl(QUrl());
     m_loaded = true;
 
     emit loadCompleted();
@@ -91,17 +92,32 @@ void EPubDocument::loadDocument()
 
 void EPubDocument::fixImages(QDomDocument &newDocument)
 {
-    // QImage which QtSvg uses isn't able to read files from inside the archive, so embed image data inline
-    QDomNodeList imageNodes = newDocument.elementsByTagName("image"); // SVG images
-    for (int i=0; i<imageNodes.count(); i++) {
-        QDomElement image = imageNodes.at(i).toElement();
-        if (!image.hasAttribute("xlink:href")) {
-            continue;
+    { // Fix relative URLs, images are lazily loaded so the base URL might not
+      // be correct when they are loaded
+        QDomNodeList imageNodes = newDocument.elementsByTagName("img");
+        for (int i=0; i<imageNodes.count(); i++) {
+            QDomElement image = imageNodes.at(i).toElement();
+            if (!image.hasAttribute("src")) {
+                continue;
+            }
+            QUrl href = QUrl(image.attribute("src"));
+            href = baseUrl().resolved(href);
+            image.setAttribute("src", href.toString());
         }
-        QString path = image.attribute("xlink:href");
-        QByteArray fileData = loadResource(0, QUrl(path)).toByteArray();
-        QByteArray data = "data:image/jpeg;base64," +fileData.toBase64();
-        image.setAttribute("xlink:href", QString::fromLatin1(data));
+    }
+
+    { // QImage which QtSvg uses isn't able to read files from inside the archive, so embed image data inline
+        QDomNodeList imageNodes = newDocument.elementsByTagName("image"); // SVG images
+        for (int i=0; i<imageNodes.count(); i++) {
+            QDomElement image = imageNodes.at(i).toElement();
+            if (!image.hasAttribute("xlink:href")) {
+                continue;
+            }
+            QString path = image.attribute("xlink:href");
+            QByteArray fileData = loadResource(0, QUrl(path)).toByteArray();
+            QByteArray data = "data:image/jpeg;base64," +fileData.toBase64();
+            image.setAttribute("xlink:href", QString::fromLatin1(data));
+        }
     }
 
     static int svgCounter = 0;
@@ -114,7 +130,7 @@ void EPubDocument::fixImages(QDomDocument &newDocument)
         // Serialize out the old SVG, store it
         QDomDocument tempDocument;
         tempDocument.appendChild(tempDocument.importNode(svgNode, true));
-        QString svgId = QString::number(++svgCounter);// + ".svg";
+        QString svgId = QString::number(++svgCounter);
         m_svgs.insert(svgId, tempDocument.toByteArray());
 
         // Create <img> node pointing to our SVG image
@@ -163,6 +179,7 @@ const QImage &EPubDocument::getSvgImage(const QString &id)
 QVariant EPubDocument::loadResource(int type, const QUrl &url)
 {
     Q_UNUSED(type);
+
 
     if (url.scheme() == "svgcache") {
         return getSvgImage(url.path());
