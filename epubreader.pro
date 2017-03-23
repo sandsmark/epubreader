@@ -12,7 +12,13 @@ QT       += core gui xml widgets svg
 
 CONFIG   += c++11
 
-QT       += KArchive
+exists(vendor/vendor.pri) {
+    include(vendor/vendor.pri)
+} else {
+    message("Not using QPM")
+    QT       += KArchive
+}
+
 
 TARGET = epubreader
 TEMPLATE = app
