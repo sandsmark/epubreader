@@ -351,9 +351,21 @@ const KArchiveFile *EPubContainer::getFile(const QString &path)
         QString folderName = pathParts[i];
         const KArchiveEntry *entry = folder->entry(folderName);
         if (!entry) {
-            qWarning() << "Unable to find folder name" << folderName << "in" << path;
-            return nullptr;
+            qWarning() << "Unable to find folder name" << folderName << "in" << path.left(100);
+            const QStringList entries = folder->entries();
+            for (const QString &folderEntry : entries) {
+                if (folderEntry.compare(folderName, Qt::CaseInsensitive) == 0) {
+                    entry = folder->entry(folderEntry);
+                    break;
+                }
+            }
+
+            if (!entry) {
+                qWarning() << "Didn't even find with case-insensitive matching";
+                return nullptr;
+            }
         }
+
         if (!entry->isDirectory()) {
             qWarning() << "Expected" << folderName << "to be a directory in path" << path;
             return nullptr;
@@ -373,6 +385,19 @@ const KArchiveFile *EPubContainer::getFile(const QString &path)
     const KArchiveFile *file = folder->file(filename);
     if (!file) {
         qWarning() << "Unable to find file" << filename << "in" << folder->name();
+
+        const QStringList entries = folder->entries();
+        for (const QString &folderEntry : entries) {
+            if (folderEntry.compare(filename, Qt::CaseInsensitive) == 0) {
+                file = folder->file(folderEntry);
+                break;
+            }
+        }
+
+        if (!file) {
+            qWarning() << "Unable to find file" << filename << "in" << folder->name() << "with case-insensitive matching" << entries;
+        }
+
     }
     return file;
 }
