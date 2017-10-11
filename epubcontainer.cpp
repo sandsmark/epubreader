@@ -59,7 +59,7 @@ QSharedPointer<QIODevice> EPubContainer::getIoDevice(const QString &path)
 {
     const KArchiveFile *file = getFile(path);
     if (!file) {
-        emit errorHappened(tr("Unable to open file %1").arg(path));
+        emit errorHappened(tr("Unable to open file %1").arg(path.left(100)));
         return QSharedPointer<QIODevice>();
     }
 
