@@ -61,6 +61,7 @@ void Widget::paintEvent(QPaintEvent*)
         painter.drawText(rect(), Qt::AlignCenter, "Loading...");
         return;
     }
+    painter.fillRect(rect(), Qt::white);
 
     painter.translate(0, -m_yOffset);
     QRect r(rect());
@@ -87,4 +88,24 @@ void Widget::resizeEvent(QResizeEvent *)
     m_document->clearCache();
     m_document->setPageSize(size());
     update();
+}
+void Widget::closeEvent(QCloseEvent *event)
+{
+    qDebug() << event;
+    // for some reason quitonlastwindowclosed doesn't work
+    //qApp->quit();
+    QDialog::closeEvent(event);
+
+    QWidgetList list = QApplication::topLevelWidgets();
+    bool lastWindowClosed = true;
+    for (int i = 0; i < list.size(); ++i) {
+        QWidget *w = list.at(i);
+        qDebug() << w << w->isVisible() << w->parentWidget() << w->testAttribute(Qt::WA_QuitOnClose);
+        if (!w->isVisible() || w->parentWidget() || !w->testAttribute(Qt::WA_QuitOnClose))
+            continue;
+        lastWindowClosed = false;
+        break;
+    }
+    qDebug() << "last closed?" << lastWindowClosed;
+    event->accept();
 }
