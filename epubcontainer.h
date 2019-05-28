@@ -50,7 +50,7 @@ class EPubContainer : public QObject
 {
     Q_OBJECT
 public:
-    explicit EPubContainer(QObject *parent = 0);
+    explicit EPubContainer(QObject *parent);
     ~EPubContainer();
 
     bool openFile(const QString path);

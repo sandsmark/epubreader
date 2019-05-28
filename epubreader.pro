@@ -7,17 +7,17 @@
 QT       += core gui xml widgets svg
 
 ## For debugging CSS
-# QT += gui-private
-# DEFINES += DEBUG_CSS
+QT += gui-private
+DEFINES += DEBUG_CSS
 
 CONFIG   += c++11
 
-exists(vendor/vendor.pri) {
-    include(vendor/vendor.pri)
-} else {
+#exists(vendor/vendor.pri) {
+#    include(vendor/vendor.pri)
+#} else {
     message("Not using QPM")
     QT       += KArchive
-}
+#}
 
 
 TARGET = epubreader

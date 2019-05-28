@@ -14,7 +14,7 @@ class EPubDocument : public QTextDocument
     Q_OBJECT
 
 public:
-    explicit EPubDocument();
+    explicit EPubDocument(QObject *parent);
     virtual ~EPubDocument();
 
     bool loaded() { return m_loaded; }
@@ -41,6 +41,7 @@ private:
     QString m_documentPath;
     EPubContainer *m_container;
     EpubItem m_currentItem;
+    QList<int> m_loadedFonts;
 
     bool m_loaded;
 };

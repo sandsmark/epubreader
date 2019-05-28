@@ -10,12 +10,15 @@
 #include <QSvgRenderer>
 #include <QPainter>
 #include <QTextBlock>
+#include <QRegularExpression>
+#include <QFontDatabase>
+#include <QTextDocumentFragment>
 
 #ifdef DEBUG_CSS
 #include <private/qcssparser_p.h>
 #endif
 
-EPubDocument::EPubDocument() : QTextDocument(),
+EPubDocument::EPubDocument(QObject *parent) : QTextDocument(parent),
     m_container(nullptr),
     m_loaded(false)
 {
@@ -24,7 +27,9 @@ EPubDocument::EPubDocument() : QTextDocument(),
 
 EPubDocument::~EPubDocument()
 {
-
+    for (const int fontId : m_loadedFonts) {
+        QFontDatabase::removeApplicationFont(fontId);
+    }
 }
 
 void EPubDocument::openDocument(const QString &path)
@@ -38,7 +43,7 @@ void EPubDocument::loadDocument()
     QElapsedTimer timer;
     timer.start();
     m_container = new EPubContainer(this);
-    connect(m_container, &EPubContainer::errorHappened, [](QString error) {
+    connect(m_container, &EPubContainer::errorHappened, this, [](QString error) {
         qWarning().noquote() << error;
     });
 
@@ -56,9 +61,15 @@ void EPubDocument::loadDocument()
         qDebug() << cover;
     }
 
+    QDomDocument domDoc;
+    QTextCursor textCursor(this);
+    textCursor.movePosition(QTextCursor::End);
+
     QTextBlockFormat pageBreak;
     pageBreak.setPageBreakPolicy(QTextFormat::PageBreak_AlwaysBefore);
-    for (const QString &chapter : items) {
+    //for (const QString &chapter : items) {
+    while(!items.isEmpty()) {
+        const QString &chapter = items.takeFirst();
         m_currentItem = m_container->getEpubItem(chapter);
         if (m_currentItem.path.isEmpty()) {
             continue;
@@ -70,28 +81,24 @@ void EPubDocument::loadDocument()
             continue;
         }
 
-        QByteArray data = ioDevice->readAll();
-        if (data.isEmpty()) {
-            qWarning() << "Got an empty document";
-            continue;
-        }
+        domDoc.setContent(ioDevice.data());
         setBaseUrl(QUrl(m_currentItem.path));
-        QDomDocument newDocument;
-        newDocument.setContent(data);
-        fixImages(newDocument);
-
-        cursor.insertHtml(newDocument.toString());
-        cursor.insertBlock(pageBreak);
+        fixImages(domDoc);
+        textCursor.insertFragment(QTextDocumentFragment::fromHtml(domDoc.toString()));
+        textCursor.insertBlock(pageBreak);
     }
+    qDebug() << "Base url:" << baseUrl();
     setBaseUrl(QUrl());
     m_loaded = true;
 
     emit loadCompleted();
     qDebug() << "Done in" << timer.elapsed() << "ms";
+    adjustSize();
 }
 
 void EPubDocument::fixImages(QDomDocument &newDocument)
 {
+    // TODO: FIXME: replace this with not smushing all HTML together in one document
     { // Fix relative URLs, images are lazily loaded so the base URL might not
       // be correct when they are loaded
         QDomNodeList imageNodes = newDocument.elementsByTagName("img");
@@ -162,13 +169,20 @@ const QImage &EPubDocument::getSvgImage(const QString &id)
     QSize svgSize(renderer.viewBox().size());
 
     if (svgSize.isValid()) {
-        svgSize.scale(imageSize, Qt::KeepAspectRatio);
+        if (svgSize.scaled(imageSize, Qt::KeepAspectRatio).isValid()) {
+            svgSize.scale(imageSize, Qt::KeepAspectRatio);
+        }
     } else {
         svgSize = imageSize;
     }
 
     QImage rendered(svgSize, QImage::Format_ARGB32);
     QPainter painter(&rendered);
+    if (!painter.isActive()) {
+        qWarning() << "Unable to activate painter" << svgSize;
+        static const QImage dummy = QImage();
+        return dummy;
+    }
     renderer.render(&painter);
     painter.end();
 
@@ -185,25 +199,71 @@ QVariant EPubDocument::loadResource(int type, const QUrl &url)
         return getSvgImage(url.path());
     }
 
+    if (url.scheme() == "data") {
+        QByteArray data = url.path().toUtf8();
+        const int start = data.indexOf(';');
+        if (start == -1) {
+            qWarning() << "unable to decode data:, no ;" << data.left(100);
+            data = QByteArray();
+
+            addResource(type, url, data);
+            return data;
+        }
+
+        data = data.mid(start + 1);
+        if (data.startsWith("base64,")) {
+            data = QByteArray::fromBase64(data.mid(data.indexOf(',') + 1));
+        } else {
+            qWarning() << "unable to decode data:, unknown encoding" << data.left(100);
+            data = QByteArray();
+        }
+
+        addResource(type, url, data);
+        return data;
+    }
+
+
     QSharedPointer<QIODevice> ioDevice = m_container->getIoDevice(url.path());
     if (!ioDevice) {
-        qWarning() << "Unable to get io device for" << url;
+        qWarning() << "Unable to get io device for" << url.toString().left(100);
+        qDebug() << url.scheme();
         return QVariant();
     }
     QByteArray data = ioDevice->readAll();
 
     if (type == QTextDocument::StyleSheetResource) {
-        QString cssData = QString::fromLocal8Bit(data);
-        cssData.replace("@charset \"", "@charset\"");
-        data = cssData.toLocal8Bit();
+        const QString cssData = QString::fromUtf8(data);
 
-#ifdef DEBUG_CSS
-//        QCss::Parser parser(cssData);
-//        QCss::StyleSheet stylesheet;
-//        qDebug() << "Parse success?" << parser.parse(&stylesheet);
-//        qDebug().noquote() << parser.errorIndex << parser.errorSymbol().lexem();
-#endif
+        // Extract embedded fonts
+        static const QRegularExpression fontfaceRegex("@font-face\\s*{[^}]+}", QRegularExpression::MultilineOption);
+        QRegularExpressionMatchIterator fontfaceIterator = fontfaceRegex.globalMatch(cssData);
+        while (fontfaceIterator.hasNext()) {
+            QString fontface = fontfaceIterator.next().captured();
 
+            static const QRegularExpression urlExpression("url\\s*\\(([^\\)]+)\\)");
+            QString fontPath = urlExpression.match(fontface).captured(1);
+            // Resolve relative and whatnot shit
+            fontPath = QDir::cleanPath(QFileInfo(baseUrl().path()).path() + '/' + fontPath);
+
+            QSharedPointer<QIODevice> ioDevice = m_container->getIoDevice(fontPath);
+            if (ioDevice) {
+                m_loadedFonts.append(QFontDatabase::addApplicationFontFromData(ioDevice->readAll()));
+                qDebug() << "Loaded font" << QFontDatabase::applicationFontFamilies(m_loadedFonts.last());
+            } else {
+                qWarning() << "Failed to load font from" << fontPath << baseUrl();
+            }
+        }
+
+        data = cssData.toUtf8();
+
+
+//#ifdef DEBUG_CSS
+        QCss::Parser parser(cssData);
+        QCss::StyleSheet stylesheet;
+        qDebug() << "=====================";
+        qDebug() << "Parse success?" << parser.parse(&stylesheet);
+        qDebug().noquote() << parser.errorIndex << parser.errorSymbol().lexem();
+//#endif
     }
 
     addResource(type, url, data);

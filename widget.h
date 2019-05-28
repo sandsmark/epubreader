@@ -1,12 +1,12 @@
 #ifndef WIDGET_H
 #define WIDGET_H
 
-#include <QWidget>
+#include <QDialog>
 
 class EPubDocument;
 class EPubContainer;
 
-class Widget : public QWidget
+class Widget : public QDialog
 {
     Q_OBJECT
 
@@ -21,6 +21,7 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     QImage m_cover;
