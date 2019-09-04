@@ -43,6 +43,7 @@ private:
     EpubItem m_currentItem;
     QList<int> m_loadedFonts;
 
+    QSizeF m_docSize;
     bool m_loaded;
 };
 

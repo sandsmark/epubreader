@@ -13,6 +13,9 @@
 #include <QRegularExpression>
 #include <QFontDatabase>
 #include <QTextDocumentFragment>
+#include <QImageReader>
+#include <QAbstractTextDocumentLayout>
+#include <qmath.h>
 
 #ifdef DEBUG_CSS
 #include <private/qcssparser_p.h>
@@ -23,6 +26,10 @@ EPubDocument::EPubDocument(QObject *parent) : QTextDocument(parent),
     m_loaded(false)
 {
     setUndoRedoEnabled(false);
+    connect(documentLayout(), &QAbstractTextDocumentLayout::documentSizeChanged, this, [=](const QSizeF &newSize) {
+            qDebug() << "doc size changed" << newSize;
+            m_docSize = newSize;
+            });
 }
 
 EPubDocument::~EPubDocument()
@@ -50,8 +57,9 @@ void EPubDocument::loadDocument()
     if (!m_container->openFile(m_documentPath)) {
         return;
     }
-    QTextCursor cursor(this);
-    cursor.movePosition(QTextCursor::End);
+    qDebug() << "Opened in" << timer.restart() << "ms";
+    //QTextCursor cursor(this);
+    //cursor.movePosition(QTextCursor::End);
 
     QStringList items = m_container->getItems();
 
@@ -63,6 +71,7 @@ void EPubDocument::loadDocument()
 
     QDomDocument domDoc;
     QTextCursor textCursor(this);
+    textCursor.beginEditBlock();
     textCursor.movePosition(QTextCursor::End);
 
     QTextBlockFormat pageBreak;
@@ -89,12 +98,39 @@ void EPubDocument::loadDocument()
     }
     qDebug() << "Base url:" << baseUrl();
     setBaseUrl(QUrl());
-    m_loaded = true;
 
     emit loadCompleted();
-    qDebug() << "Load done in" << timer.elapsed() << "ms";
-    adjustSize();
+    qDebug() << "Load done in" << timer.restart() << "ms";
+    {
+        QElapsedTimer timer;
+        timer.start();
+        QFont f = defaultFont();
+        QFontMetrics fm(f);
+        int mw =  fm.horizontalAdvance(QLatin1Char('x')) * 80;
+        int w = mw;
+        setTextWidth(w);
+        qDebug() << "Text width set in" << timer.restart() << "ms";
+        QSizeF size = m_docSize;
+        if (size.width() != 0) {
+            w = qSqrt((uint)(5 * size.height() * size.width() / 3));
+            setTextWidth(qMin(w, mw));
+
+            size = m_docSize;//documentLayout()->documentSize();
+            if (w*3 < 5*size.height()) {
+                w = qSqrt((uint)(2 * size.height() * size.width()));
+                setTextWidth(qMin(w, mw));
+            }
+        }
+        qDebug() << "Text width changed in" << timer.restart() << "ms";
+        w = idealWidth();
+        qDebug() << "Ideal width in" << timer.restart() << "ms";
+        setTextWidth(w);
+        qDebug() << "Final text width in" << timer.restart() << "ms";
+    }
     qDebug() << "Adjust size done in" << timer.elapsed() << "ms";
+    textCursor.endEditBlock();
+
+    m_loaded = true;
 }
 
 void EPubDocument::fixImages(QDomDocument &newDocument)
