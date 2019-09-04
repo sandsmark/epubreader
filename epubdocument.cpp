@@ -92,8 +92,9 @@ void EPubDocument::loadDocument()
     m_loaded = true;
 
     emit loadCompleted();
-    qDebug() << "Done in" << timer.elapsed() << "ms";
+    qDebug() << "Load done in" << timer.elapsed() << "ms";
     adjustSize();
+    qDebug() << "Adjust size done in" << timer.elapsed() << "ms";
 }
 
 void EPubDocument::fixImages(QDomDocument &newDocument)

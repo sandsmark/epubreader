@@ -15,8 +15,6 @@ Widget::Widget(QWidget *parent)
       m_document(new EPubDocument(this)),
       m_currentChapter(0)
 {
-    //setAttribute(Qt::WA_DeleteOnClose);
-    setAttribute(Qt::WA_QuitOnClose, true);
     setWindowFlags(Qt::Dialog);
     resize(600, 800);
     m_document->setParent(this);
@@ -24,21 +22,40 @@ Widget::Widget(QWidget *parent)
     connect(m_document, &EPubDocument::loadCompleted, this, [&]() {
         update();
     });
-
-    m_document->setPageSize(size());
-
-    QSettings settings;
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open epub"), settings.value("lastFile").toString(), tr("EPUB files (*.epub)"));
-    if (!fileName.isEmpty()) {
-        settings.setValue("lastFile", fileName);
-        m_document->openDocument(fileName);
-    }
-    show();
 }
 
 Widget::~Widget()
 {
 
+}
+bool Widget::loadFile()
+{
+    QSettings settings;
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open epub"), settings.value("lastFile").toString(), tr("EPUB files (*.epub)"));
+    if (fileName.isEmpty()) {
+        return false;
+    }
+
+    settings.setValue("lastFile", fileName);
+
+    return loadFile(fileName);
+}
+
+bool Widget::loadFile(const QString &path)
+{
+    if (path.isEmpty()) {
+        return false;
+    }
+
+    if (!QFile::exists(path)) {
+        qWarning() << path << "doesn't exist";
+        return false;
+    }
+
+    m_document->setPageSize(size());
+    m_document->openDocument(path);
+
+    return true;
 }
 
 void Widget::scroll(int amount)
@@ -112,24 +129,4 @@ void Widget::resizeEvent(QResizeEvent *)
     m_document->clearCache();
     m_document->setPageSize(size());
     update();
-}
-void Widget::closeEvent(QCloseEvent *event)
-{
-    qDebug() << event;
-    // for some reason quitonlastwindowclosed doesn't work
-    //qApp->quit();
-    QDialog::closeEvent(event);
-
-    QWidgetList list = QApplication::topLevelWidgets();
-    bool lastWindowClosed = true;
-    for (int i = 0; i < list.size(); ++i) {
-        QWidget *w = list.at(i);
-        qDebug() << w << w->isVisible() << w->parentWidget() << w->testAttribute(Qt::WA_QuitOnClose);
-        if (!w->isVisible() || w->parentWidget() || !w->testAttribute(Qt::WA_QuitOnClose))
-            continue;
-        lastWindowClosed = false;
-        break;
-    }
-    qDebug() << "last closed?" << lastWindowClosed;
-    event->accept();
 }
