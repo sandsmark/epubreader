@@ -294,13 +294,13 @@ QVariant EPubDocument::loadResource(int type, const QUrl &url)
         data = cssData.toUtf8();
 
 
-//#ifdef DEBUG_CSS
+#ifdef DEBUG_CSS
         QCss::Parser parser(cssData);
         QCss::StyleSheet stylesheet;
         qDebug() << "=====================";
         qDebug() << "Parse success?" << parser.parse(&stylesheet);
         qDebug().noquote() << parser.errorIndex << parser.errorSymbol().lexem();
-//#endif
+#endif
     }
 
     addResource(type, url, data);
